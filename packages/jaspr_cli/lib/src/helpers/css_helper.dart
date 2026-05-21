@@ -70,97 +70,80 @@ class CssRunner {
 
     String? universalWebPath;
 
-    if (!packageConfigFile.existsSync()) {
-      final originalPackageConfigPath = findPackageConfigFilePath() ?? '.dart_tool/package_config.json';
-      final originalPackageConfigFile = File(originalPackageConfigPath);
-      if (originalPackageConfigFile.existsSync()) {
-        final config = jsonDecode(originalPackageConfigFile.readAsStringSync()) as Map<String, dynamic>;
-        final packages = (config['packages'] as List<dynamic>?)?.cast<Map<String, dynamic>>();
-        if (packages != null) {
-          Map<String, dynamic>? universalWebEntry;
-
-          for (final package in packages) {
-            if (package case {'name': 'universal_web'}) {
-              universalWebEntry = package;
-            }
-          }
-
-          if (universalWebEntry != null) {
-            final universalWebRootUri = Uri.parse(universalWebEntry['rootUri'] as String);
-            final absoluteUniversalWebRootUri = universalWebRootUri.isAbsolute
-                ? universalWebRootUri
-                : Uri.file(p.normalize(p.join(p.dirname(originalPackageConfigFile.path), universalWebRootUri.path)));
-
-            // Save path for libraries.json
-            universalWebPath = p.normalize(
-              p.join(absoluteUniversalWebRootUri.toFilePath(), universalWebEntry['packageUri'] as String? ?? 'lib/'),
-            );
-
-            universalWebEntry['packageUri'] = 'web_override/lib/';
-          }
-          // Make all relative paths absolute
-          for (final package in packages) {
-            final rootUri = Uri.parse(package['rootUri'] as String);
-            if (!rootUri.isAbsolute) {
-              package['rootUri'] = Uri.file(
-                p.normalize(p.join(p.dirname(originalPackageConfigFile.path), rootUri.path)),
-              ).toString();
-            }
-          }
-        }
-
-        packageConfigFile.createSync(recursive: true);
-        packageConfigFile.writeAsStringSync(JsonEncoder.withIndent('  ').convert(config));
-      }
-    } else {
-      // If package_config.json exists, just read the universal_web path for libraries.json
-      final config = jsonDecode(packageConfigFile.readAsStringSync()) as Map<String, dynamic>;
-      final packages = config['packages'] as List<dynamic>?;
+    final originalPackageConfigPath = findPackageConfigFilePath() ?? '.dart_tool/package_config.json';
+    final originalPackageConfigFile = File(originalPackageConfigPath);
+    if (originalPackageConfigFile.existsSync()) {
+      final config = jsonDecode(originalPackageConfigFile.readAsStringSync()) as Map<String, dynamic>;
+      final packages = (config['packages'] as List<dynamic>?)?.cast<Map<String, dynamic>>();
       if (packages != null) {
+        Map<String, dynamic>? universalWebEntry;
+
         for (final package in packages) {
           if (package case {'name': 'universal_web'}) {
-            final rootUri = Uri.parse(package['rootUri'] as String);
-            universalWebPath = p.normalize(p.join(rootUri.toFilePath(), package['packageUri'] as String? ?? 'lib/'));
-            break;
+            universalWebEntry = package;
+          }
+        }
+
+        if (universalWebEntry != null) {
+          final universalWebRootUri = Uri.parse(universalWebEntry['rootUri'] as String);
+          final absoluteUniversalWebRootUri = universalWebRootUri.isAbsolute
+              ? universalWebRootUri
+              : Uri.file(p.normalize(p.join(p.dirname(originalPackageConfigFile.path), universalWebRootUri.path)));
+
+          // Save path for libraries.json
+          universalWebPath = p.normalize(
+            p.join(absoluteUniversalWebRootUri.toFilePath(), universalWebEntry['packageUri'] as String? ?? 'lib/'),
+          );
+
+          universalWebEntry['packageUri'] = 'web_override/lib/';
+        }
+        // Make all relative paths absolute
+        for (final package in packages) {
+          final rootUri = Uri.parse(package['rootUri'] as String);
+          if (!rootUri.isAbsolute) {
+            package['rootUri'] = Uri.file(
+              p.normalize(p.join(p.dirname(originalPackageConfigFile.path), rootUri.path)),
+            ).toString();
           }
         }
       }
+
+      packageConfigFile.createSync(recursive: true);
+      packageConfigFile.writeAsStringSync(JsonEncoder.withIndent('  ').convert(config));
     }
 
-    if (!librariesFile.existsSync()) {
-      if (universalWebPath == null) return;
+    if (universalWebPath == null) return;
 
-      final mockJSInteropUri = Uri.file(p.absolute(p.join(universalWebPath, 'src/js_interop.dart'))).toString();
-      final mockJSInteropUnsafeUri = Uri.file(p.absolute(p.join(universalWebPath, 'src/js_interop_unsafe_override.dart'))).toString();
+    final mockJSInteropUri = Uri.file(p.absolute(p.join(universalWebPath, 'src/js_interop.dart'))).toString();
+    final mockJSInteropUnsafeUri = Uri.file(p.absolute(p.join(universalWebPath, 'src/js_interop_unsafe_override.dart'))).toString();
 
-      final defaultLibrariesJson = File(p.join(dartSdkDir, 'lib', 'libraries.json'));
-      if (!defaultLibrariesJson.existsSync()) return;
+    final defaultLibrariesJson = File(p.join(dartSdkDir, 'lib', 'libraries.json'));
+    if (!defaultLibrariesJson.existsSync()) return;
 
-      final librariesJsonStr = defaultLibrariesJson.readAsStringSync();
-      final libraries = jsonDecode(librariesJsonStr) as Map<String, dynamic>;
+    final librariesJsonStr = defaultLibrariesJson.readAsStringSync();
+    final libraries = jsonDecode(librariesJsonStr) as Map<String, dynamic>;
 
-      if (libraries['vm_common'] case {'libraries': final Map<String, dynamic> libs}) {
-        final versionFile = File(p.join(dartSdkDir, 'version'));
-        final dartVersion = Version.parse(versionFile.readAsStringSync().trim().split(' ').first);
-        final isDart311OrHigher = dartVersion >= Version(3, 11, 0);
-        final supportedFlag = isDart311OrHigher ? 'support_conditional_import' : 'supported';
+    if (libraries['vm_common'] case {'libraries': final Map<String, dynamic> libs}) {
+      final versionFile = File(p.join(dartSdkDir, 'version'));
+      final dartVersion = Version.parse(versionFile.readAsStringSync().trim().split(' ').first);
+      final isDart311OrHigher = dartVersion >= Version(3, 11, 0);
+      final supportedFlag = isDart311OrHigher ? 'support_conditional_import' : 'supported';
 
-        if (project.modeOrNull == JasprMode.client) {
-          libs['js_interop'] = {'uri': mockJSInteropUri};
-          libs['js_interop_unsafe'] = {'uri': mockJSInteropUnsafeUri};
+      if (project.modeOrNull == JasprMode.client) {
+        libs['js_interop'] = {'uri': mockJSInteropUri};
+        libs['js_interop_unsafe'] = {'uri': mockJSInteropUnsafeUri};
 
-          if (libs['io'] case final Map<String, dynamic> io) io[supportedFlag] = false;
-          if (libs['ffi'] case final Map<String, dynamic> ffi) ffi[supportedFlag] = false;
-          if (libs['isolate'] case final Map<String, dynamic> isolate) isolate[supportedFlag] = false;
-        } else {
-          libs['js_interop'] = {'uri': mockJSInteropUri, supportedFlag: false};
-          libs['js_interop_unsafe'] = {'uri': mockJSInteropUnsafeUri, supportedFlag: false};
-        }
+        if (libs['io'] case final Map<String, dynamic> io) io[supportedFlag] = false;
+        if (libs['ffi'] case final Map<String, dynamic> ffi) ffi[supportedFlag] = false;
+        if (libs['isolate'] case final Map<String, dynamic> isolate) isolate[supportedFlag] = false;
+      } else {
+        libs['js_interop'] = {'uri': mockJSInteropUri, supportedFlag: false};
+        libs['js_interop_unsafe'] = {'uri': mockJSInteropUnsafeUri, supportedFlag: false};
       }
-
-      librariesFile.createSync(recursive: true);
-      librariesFile.writeAsStringSync(JsonEncoder.withIndent('  ').convert(libraries));
     }
+
+    librariesFile.createSync(recursive: true);
+    librariesFile.writeAsStringSync(JsonEncoder.withIndent('  ').convert(libraries));
 
     wrapperFile.createSync(recursive: true);
     wrapperFile.writeAsStringSync('''
@@ -407,7 +390,8 @@ void main(List<String> args) async {
         validRunnerFiles[i].path,
         from: Directory.current.absolute.uri.resolve('.dart_tool/jaspr/css/').path,
       );
-      runnerCode.writeln("import '$relative' as s$i;");
+      final relativeUri = relative.replaceAll(r'\', '/');
+      runnerCode.writeln("import '$relativeUri' as s$i;");
     }
     runnerCode.writeln('\nvoid main() {');
 
