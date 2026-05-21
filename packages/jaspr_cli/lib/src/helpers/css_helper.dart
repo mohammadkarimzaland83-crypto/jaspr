@@ -194,7 +194,9 @@ void main(List<String> args) async {
     final cssFiles = await _generateRunner(watch: true);
     if (cssFiles.isEmpty) return;
 
-    final platformKernel = p.join(dartSdkDir, 'lib', '_internal', 'vm_platform_strong.dill');
+    final platformKernel = Uri.file(
+      p.join(dartSdkDir, 'lib', '_internal', 'vm_platform_strong.dill'),
+    ).toString();
 
     client = await FrontendServerClient.start(
       runnerFile.path,
@@ -317,7 +319,9 @@ void main(List<String> args) async {
     final cssFiles = await _generateRunner(watch: false);
     if (cssFiles.isEmpty) return 0;
 
-    final platformKernel = p.join(dartSdkDir, 'lib', '_internal', 'vm_platform_strong.dill');
+    final platformKernel = Uri.file(
+      p.join(dartSdkDir, 'lib', '_internal', 'vm_platform_strong.dill'),
+    ).toString();
 
     final client = await FrontendServerClient.start(
       runnerFile.path,
