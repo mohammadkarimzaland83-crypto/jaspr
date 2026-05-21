@@ -130,8 +130,8 @@ class CssRunner {
     if (!librariesFile.existsSync()) {
       if (universalWebPath == null) return;
 
-      final mockJSInteropPath = p.absolute(p.join(universalWebPath, 'src/js_interop.dart'));
-      final mockJSInteropUnsafePath = p.absolute(p.join(universalWebPath, 'src/js_interop_unsafe_override.dart'));
+      final mockJSInteropUri = Uri.file(p.absolute(p.join(universalWebPath, 'src/js_interop.dart'))).toString();
+      final mockJSInteropUnsafeUri = Uri.file(p.absolute(p.join(universalWebPath, 'src/js_interop_unsafe_override.dart'))).toString();
 
       final defaultLibrariesJson = File(p.join(dartSdkDir, 'lib', 'libraries.json'));
       if (!defaultLibrariesJson.existsSync()) return;
@@ -146,15 +146,15 @@ class CssRunner {
         final supportedFlag = isDart311OrHigher ? 'support_conditional_import' : 'supported';
 
         if (project.modeOrNull == JasprMode.client) {
-          libs['js_interop'] = {'uri': mockJSInteropPath};
-          libs['js_interop_unsafe'] = {'uri': mockJSInteropUnsafePath};
+          libs['js_interop'] = {'uri': mockJSInteropUri};
+          libs['js_interop_unsafe'] = {'uri': mockJSInteropUnsafeUri};
 
           if (libs['io'] case final Map<String, dynamic> io) io[supportedFlag] = false;
           if (libs['ffi'] case final Map<String, dynamic> ffi) ffi[supportedFlag] = false;
           if (libs['isolate'] case final Map<String, dynamic> isolate) isolate[supportedFlag] = false;
         } else {
-          libs['js_interop'] = {'uri': mockJSInteropPath, supportedFlag: false};
-          libs['js_interop_unsafe'] = {'uri': mockJSInteropUnsafePath, supportedFlag: false};
+          libs['js_interop'] = {'uri': mockJSInteropUri, supportedFlag: false};
+          libs['js_interop_unsafe'] = {'uri': mockJSInteropUnsafeUri, supportedFlag: false};
         }
       }
 
@@ -170,7 +170,7 @@ import 'package:path/path.dart' as p;
 void main(List<String> args) async {
   final sdkDir = r'$dartSdkDir';
   final aotSnapshot = p.join(sdkDir, 'bin', 'snapshots', 'frontend_server_aot.dart.snapshot');
-  final newArgs = [...args, '--libraries-spec', '${librariesFile.path}'];
+  final newArgs = [...args, '--libraries-spec', '${librariesFile.uri}'];
   
   final process = await Process.start(
     p.join(sdkDir, 'bin', 'dartaotruntime'),
@@ -205,7 +205,7 @@ void main(List<String> args) async {
       target: 'vm',
       sdkRoot: dartSdkDir,
       frontendServerPath: wrapperFile.path,
-      packagesJson: packageConfigFile.path,
+      packagesJson: packageConfigFile.uri.toString(),
       printIncrementalDependencies: false,
     );
 
@@ -329,7 +329,7 @@ void main(List<String> args) async {
       platformKernel,
       target: 'vm',
       frontendServerPath: wrapperFile.path,
-      packagesJson: packageConfigFile.path,
+      packagesJson: packageConfigFile.uri.toString(),
       printIncrementalDependencies: false,
     );
     final compilerResult = await client.compile();
