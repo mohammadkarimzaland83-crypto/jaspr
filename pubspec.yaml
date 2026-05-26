@@ -35,6 +35,18 @@ dev_dependencies:
 dependency_overrides:
   # Until melos upgrades to this version
   cli_util: 0.5.0
+  # Until 2.0.0 is published
+  universal_web:
+    git:
+      url: https://github.com/schultek/universal_web
+      path: web
+      ref: next
+  web:
+    git:
+      url: https://github.com/dart-lang/web
+      path: web
+      # Matches ../third_party/dart-sdk/sdk/DEPS `web_rev`.
+      ref: 48b75126e511e2d3de65130f2e7aa21cca58f473
 
 melos:
   command:
