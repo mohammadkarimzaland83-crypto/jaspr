@@ -20,7 +20,7 @@ import '../process_runner.dart';
 import '../project.dart';
 
 extension CssHelper on BaseCommand {
-  void watchCss(ClientWorkflow workflow) async {
+  Future<CssRunner> watchCss(ClientWorkflow workflow) async {
     final runner = CssRunner(workflow, project, logger)..prepare();
     await runner.start();
 
@@ -30,6 +30,8 @@ extension CssHelper on BaseCommand {
       workflow.devProxy.unregisterPostReloadCallback(runner.reload);
       runner.dispose();
     });
+
+    return runner;
   }
 
   Future<int> buildCss() async {
@@ -58,6 +60,9 @@ class CssRunner {
 
   VmService? vmService;
   String? isolateId;
+
+  final Completer<void> _initialGenerationCompleter = Completer<void>();
+  Future<void> get initialGenerationComplete => process != null ? _initialGenerationCompleter.future : Future.value();
 
   bool _disposed = false;
 
@@ -115,7 +120,9 @@ class CssRunner {
     if (universalWebPath == null) return;
 
     final mockJSInteropUri = Uri.file(p.absolute(p.join(universalWebPath, 'src/js_interop.dart'))).toString();
-    final mockJSInteropUnsafeUri = Uri.file(p.absolute(p.join(universalWebPath, 'src/js_interop_unsafe_override.dart'))).toString();
+    final mockJSInteropUnsafeUri = Uri.file(
+      p.absolute(p.join(universalWebPath, 'src/js_interop_unsafe_override.dart')),
+    ).toString();
 
     final defaultLibrariesJson = File(p.join(dartSdkDir, 'lib', 'libraries.json'));
     if (!defaultLibrariesJson.existsSync()) return;
@@ -181,6 +188,8 @@ void main(List<String> args) async {
       p.join(dartSdkDir, 'lib', '_internal', 'vm_platform_strong.dill'),
     ).toString();
 
+    logger.write('Starting CSS generation...', tag: Tag.cli);
+
     client = await FrontendServerClient.start(
       runnerFile.path,
       Directory.current.absolute.uri.resolve('.dart_tool/jaspr/css/css_runner.dill').toFilePath(),
@@ -206,8 +215,6 @@ void main(List<String> args) async {
   }
 
   Future<void> _startProcess(List<String> cssFiles) async {
-    logger.write("Starting frontend server with input '${runnerFile.path} at ${Directory.current.path}", tag: Tag.cli);
-
     process = await Process.start(
       dartExecutable,
       [
@@ -228,10 +235,13 @@ void main(List<String> args) async {
           try {
             vmService = await vmServiceConnectUri(wsUri);
             final vm = await vmService!.getVM();
-            logger.write('Connected to CSS VM service: $wsUri', tag: Tag.cli, level: Level.verbose);
             isolateId = vm.isolates!.first.id;
           } catch (e) {
-            logger.write('Failed to connect to CSS VM service: $e', tag: Tag.cli, level: Level.warning);
+            logger.write(
+              'Failed to connect to CSS runner, styles will not be hot-reloaded: $e',
+              tag: Tag.cli,
+              level: Level.warning,
+            );
           }
           return;
         }
@@ -240,6 +250,9 @@ void main(List<String> args) async {
       _processCssOutput(
         line,
         onDone: () {
+          if (!_initialGenerationCompleter.isCompleted) {
+            _initialGenerationCompleter.complete();
+          }
           for (final connection in workflow!.devProxy.getClientConnections()) {
             _reloadStylesheets(connection, cssFiles);
           }
@@ -259,6 +272,9 @@ void main(List<String> args) async {
       process = null;
       vmService = null;
       isolateId = null;
+      if (!_initialGenerationCompleter.isCompleted) {
+        _initialGenerationCompleter.complete();
+      }
     });
   }
 
@@ -459,5 +475,8 @@ void main(List<String> args) async {
     client?.kill();
     process?.kill();
     vmService?.dispose();
+    if (!_initialGenerationCompleter.isCompleted) {
+      _initialGenerationCompleter.complete();
+    }
   }
 }

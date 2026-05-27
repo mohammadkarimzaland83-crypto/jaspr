@@ -120,7 +120,7 @@ abstract class DevCommand extends BaseCommand with ProxyHelper, FlutterHelper {
 
     handleClientWorkflow(workflow);
 
-    watchCss(workflow);
+    final cssRunner = await watchCss(workflow);
 
     if (project.flutterMode == FlutterMode.embedded) {
       final flutterProcess = await serveFlutter(useWasm);
@@ -138,6 +138,8 @@ abstract class DevCommand extends BaseCommand with ProxyHelper, FlutterHelper {
       flutterPort: project.flutterMode == FlutterMode.embedded ? flutterProxyPort : null,
       redirectNotFound: project.requireMode == JasprMode.client,
     );
+
+    await cssRunner.initialGenerationComplete;
 
     if (project.requireMode == JasprMode.client) {
       logger.write('Serving at http://localhost:$proxyPort', tag: Tag.cli);
